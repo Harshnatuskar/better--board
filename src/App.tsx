@@ -22,16 +22,16 @@ function createElement(x1: number, y1: number, x2: number, y2: number, type: str
 function App() {
   const [elements, setElements] = useState<Element[]>([]);
   const [drawing, setDrawing] = useState(false);
-  const [elementType, setElementType] = useState<string>("line");
+  const [tool, setTool] = useState<string>("line");
 
 
   useEffect(() => {
     // Add event listener for keydown to toggle between 'line' and 'rectangle' tools
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'l' || event.key === 'L') {
-        setElementType('line');
+        setTool('line');
       } else if (event.key === 'r' || event.key === 'R') {
-        setElementType('rectangle');
+        setTool('rectangle');
       }
     };
 
@@ -63,12 +63,16 @@ function App() {
   }, [elements]);
 
   const handleLineButtonClick = () => {
-    setElementType('line');
+    setTool('line');
   };
 
   const handleRectangleButtonClick = () => {
-    setElementType('rectangle');
+    setTool('rectangle');
   };
+
+  const handleSelection = () =>{
+    setTool('selection')
+  }
 
   const handleMouseDown = (event: React.MouseEvent | React.TouchEvent) => {
     setDrawing(true);
@@ -76,7 +80,7 @@ function App() {
     const { clientX, clientY } = 'touches' in event ? event.touches[0] : (event as React.MouseEvent);
 
 
-    const element = createElement(clientX, clientY, clientX, clientY, elementType);
+    const element = createElement(clientX, clientY, clientX, clientY, tool);
     setElements(prevState => [...prevState,element])
   };
 
@@ -86,7 +90,7 @@ function App() {
     const { clientX, clientY } = 'touches' in event ? event.touches[0] : event as React.MouseEvent;
     const index = elements.length - 1;
     const { x1, y1 } = elements[index];
-    const updatedElement = createElement(x1, y1, clientX, clientY, elementType);
+    const updatedElement = createElement(x1, y1, clientX, clientY, tool);
 
     const elementsCopy = [...elements];
     elementsCopy[index] = updatedElement;
@@ -100,6 +104,13 @@ function App() {
   return (
     <>
       <div style={{ position: "fixed", bottom: 15, right: 15, display: "flex", flexDirection: "column", gap: 10 }}>
+        <button 
+          id="selection" 
+          onClick={handleSelection}
+          style={{ backgroundColor: "grey", padding: "5px 10px", border: "none", borderRadius: "5px", cursor: "pointer" }}
+        >
+          S
+        </button>
         <button 
           id="line" 
           onClick={handleLineButtonClick}
