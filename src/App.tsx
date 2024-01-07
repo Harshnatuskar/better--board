@@ -119,6 +119,9 @@ function App() {
         id="canvas"
         width={window.innerWidth}
         height={window.innerHeight}
+        onTouchStart={handleMouseDown}
+        onTouchMove={handleMouseMove}
+        onTouchEnd={handleMouseUp}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
