@@ -10,34 +10,66 @@ interface Element {
   x2: number;
   y2: number;
   roughElement: Drawable;
+  type: 'line' | 'rectangle';
+  id: number;
+  offsetX?: number | undefined;
+  offsetY?: number | undefined;
 }
 
-function createElement(x1: number, y1: number, x2: number, y2: number, type: string):Element {
+interface Point {
+  x: number;
+  y: number;
+}
+
+function createElement(id: number,x1: number, y1: number, x2: number, y2: number, type: string):Element {
   const roughElement = type === "line"
     ? generator.line(x1, y1, x2, y2,{roughness: 0.5})
     : generator.rectangle(x1, y1, x2 - x1, y2 - y1,{roughness: 0.5});
-  return { x1, y1, x2, y2, roughElement };
+  return {id, x1, y1, x2, y2, roughElement , type: type as 'line'| 'rectangle',offsetX: undefined, offsetY: undefined  };
+}
+
+const distance = (a: Point, b: Point) => Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2))
+
+const isWithinElement = (x: number, y: number, element: Element):boolean=>{
+  const {type,x1,x2,y1,y2} = element
+  if(type === "rectangle"){
+    const minX = Math.min(x1, x2)
+    const maxX = Math.max(x1, x2)
+    const minY = Math.min(y1, y2)
+    const maxY = Math.max(y1, y2)
+    return x >= minX &&  x <= maxX && y >= minY && y <= maxY
+  }else{
+    const a = { x:x1, y:y1}
+    const b = { x:x2, y:y2}
+    const c = { x, y}
+    const offset = distance(a,b) - (distance(a,c) + distance(b,c))
+    return Math.abs(offset) < 1
+  }
+}
+
+const getElementAtPosition= (x:number, y:number, elements: Element[]): Element | undefined=>{
+  return elements.find(element => isWithinElement(x,y,element))
 }
 
 function App() {
   const [elements, setElements] = useState<Element[]>([]);
-  const [drawing, setDrawing] = useState(false);
+  const [action, setAction] = useState("none");
   const [tool, setTool] = useState<string>("line");
-
+  const [selectedElement, setSelectedElement] = useState<Element | null>(null)
 
   useEffect(() => {
-    // Add event listener for keydown to toggle between 'line' and 'rectangle' tools
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'l' || event.key === 'L') {
         setTool('line');
       } else if (event.key === 'r' || event.key === 'R') {
         setTool('rectangle');
+      } else if (event.key === 's' || event.key === 'S') {
+        setTool('selection');
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
 
-    // Cleanup the event listener on component unmount
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
@@ -62,6 +94,14 @@ function App() {
     elements.forEach(({ roughElement }) => roughCanvas.draw(roughElement));
   }, [elements]);
 
+  const updateElement = (id: number, x1:number, y1:number, clientX:number, clientY:number, type:string) =>{
+    const updatedElement = createElement(id, x1, y1, clientX, clientY, type)
+
+    const elementsCopy = [...elements]
+    elementsCopy[id] = updatedElement
+    setElements(elementsCopy)
+  }
+
   const handleLineButtonClick = () => {
     setTool('line');
   };
@@ -75,30 +115,62 @@ function App() {
   }
 
   const handleMouseDown = (event: React.MouseEvent | React.TouchEvent) => {
-    setDrawing(true);
-
     const { clientX, clientY } = 'touches' in event ? event.touches[0] : (event as React.MouseEvent);
-
-
-    const element = createElement(clientX, clientY, clientX, clientY, tool);
-    setElements(prevState => [...prevState,element])
+    if(tool === "selection"){
+      const element = getElementAtPosition(clientX, clientY, elements)
+      if(element){ 
+        const offsetX = clientX - element.x1
+        const offsetY = clientY - element.y1
+        setSelectedElement({...element, offsetX, offsetY})
+        setAction("moving") 
+      }
+    }else{
+      const id = elements.length
+      const element = createElement(id,clientX, clientY, clientX, clientY, tool);
+      setElements(prevState => [...prevState,element])
+      setAction("drawing")
+    }
+    
   };
 
   const handleMouseMove = (event: React.MouseEvent | React.TouchEvent) => {
-    if (!drawing) return;
+    let clientX, clientY;
 
-    const { clientX, clientY } = 'touches' in event ? event.touches[0] : event as React.MouseEvent;
-    const index = elements.length - 1;
-    const { x1, y1 } = elements[index];
-    const updatedElement = createElement(x1, y1, clientX, clientY, tool);
+    if ('touches' in event) {
+      const touch = event.touches[0];
+      clientX = touch.clientX;
+      clientY = touch.clientY;
+    } else {
+      clientX = (event as React.MouseEvent).clientX;
+      clientY = (event as React.MouseEvent).clientY;
+    }
 
-    const elementsCopy = [...elements];
-    elementsCopy[index] = updatedElement;
-    setElements(elementsCopy);
+    if (tool === "selection") {
+      const target = event.target as HTMLElement;
+      target.style.cursor = getElementAtPosition(clientX, clientY, elements) 
+      ? "move" : 
+      "default";
+    }
+    
+
+    if (action === "drawing"){
+      const { clientX, clientY } = 'touches' in event ? event.touches[0] : event as React.MouseEvent;
+      const index = elements.length - 1;
+      const { x1, y1 } = elements[index];
+      updateElement(index,x1, y1, clientX, clientY, tool);
+    } else if(action === "moving" && selectedElement){
+      const {id, x1, x2, y1, y2, type, offsetX = 0, offsetY=0} = selectedElement
+      const height = y2 -y1
+      const width = x2 -x1
+      const newX1 = clientX - offsetX
+      const newY1 = clientY - offsetY
+      updateElement(id, newX1, newY1, newX1 + width, newY1 + height, type)
+    }
   };
 
   const handleMouseUp = () => {
-    setDrawing(false);
+    setAction("none");
+    setSelectedElement(null)
   };
 
   return (
