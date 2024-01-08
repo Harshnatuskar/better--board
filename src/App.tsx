@@ -22,9 +22,10 @@ interface Point {
 }
 
 function createElement(id: number,x1: number, y1: number, x2: number, y2: number, type: string):Element {
+  const lineColor = "grey"
   const roughElement = type === "line"
-    ? generator.line(x1, y1, x2, y2,{roughness: 0.5})
-    : generator.rectangle(x1, y1, x2 - x1, y2 - y1,{roughness: 0.5});
+    ? generator.line(x1, y1, x2, y2,{roughness: 0.5,stroke: lineColor })
+    : generator.rectangle(x1, y1, x2 - x1, y2 - y1,{roughness: 0.5,stroke: lineColor });
   return {id, x1, y1, x2, y2, roughElement , type: type as 'line'| 'rectangle',offsetX: undefined, offsetY: undefined  };
 }
 
@@ -56,6 +57,7 @@ function App() {
   const [action, setAction] = useState("none");
   const [tool, setTool] = useState<string>("line");
   const [selectedElement, setSelectedElement] = useState<Element | null>(null)
+  const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -173,9 +175,37 @@ function App() {
     setSelectedElement(null)
   };
 
+  const toggleDarkMode = () => {
+    setDarkMode(prevDarkMode => !prevDarkMode);
+  
+    const body = document.body;
+    if (darkMode) {
+      body.style.backgroundColor = "#1a1a1a";
+      body.style.color = "#ffffff";
+    } else {
+      body.style.backgroundColor = "#ffffff";
+      body.style.color = "#000000";
+    }
+  };
+  
+
   return (
     <>
       <div style={{ position: "fixed", bottom: 15, right: 15, display: "flex", flexDirection: "column", gap: 10 }}>
+        <button
+          id="darkMode"
+          onClick={toggleDarkMode}
+          style={{
+            backgroundColor: darkMode ? "grey" : "white",
+            color: darkMode ? "white" : "grey",
+            padding: "5px 10px",
+            border: "none",
+            borderRadius: "5px",
+            cursor: "pointer",
+          }}
+        >
+          D
+        </button>
         <button 
           id="selection" 
           onClick={handleSelection}
