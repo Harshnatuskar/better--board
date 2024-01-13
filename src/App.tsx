@@ -179,17 +179,22 @@ function App() {
   };
 
   const toggleDarkMode = () => {
-    setDarkMode(prevDarkMode => !prevDarkMode);
-  
+  setDarkMode((prevDarkMode) => {
+    const newDarkMode = !prevDarkMode;
+
     const body = document.body;
-    if (darkMode) {
+    if (newDarkMode) {
       body.style.backgroundColor = "#1a1a1a";
       body.style.color = "#ffffff";
     } else {
       body.style.backgroundColor = "#ffffff";
       body.style.color = "#000000";
     }
-  };
+
+    return newDarkMode;
+  });
+};
+
   
 
   return (
@@ -199,8 +204,8 @@ function App() {
           id="darkMode"
           onClick={toggleDarkMode}
           style={{
-            backgroundColor: darkMode ? "grey" : "white",
-            color: darkMode ? "white" : "grey",
+            backgroundColor: darkMode ? "grey" : "#757575",
+            color: darkMode ? "white" : "#ffffff",
             padding: "5px 10px",
             border: "none",
             borderRadius: "5px",
