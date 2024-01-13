@@ -116,8 +116,16 @@ function App() {
     setTool('selection')
   }
 
+  const getTouchCoordinates = (event: React.TouchEvent) =>{
+    const touch = event.touches[0];
+    return{
+      clientX: touch.clientX,
+      clientY: touch.clientY
+    }
+  }
+
   const handleMouseDown = (event: React.MouseEvent | React.TouchEvent) => {
-    const { clientX, clientY } = 'touches' in event ? event.touches[0] : (event as React.MouseEvent);
+    const { clientX, clientY } = 'touches' in event ? getTouchCoordinates(event as React.TouchEvent) : (event as React.MouseEvent);
     if(tool === "selection"){
       const element = getElementAtPosition(clientX, clientY, elements)
       if(element){ 
@@ -137,7 +145,7 @@ function App() {
 
   const handleMouseMove = (event: React.MouseEvent | React.TouchEvent) => {
     let clientX, clientY;
-
+  
     if ('touches' in event) {
       const touch = event.touches[0];
       clientX = touch.clientX;
@@ -146,33 +154,34 @@ function App() {
       clientX = (event as React.MouseEvent).clientX;
       clientY = (event as React.MouseEvent).clientY;
     }
-
+  
     if (tool === "selection") {
       const target = event.target as HTMLElement;
-      target.style.cursor = getElementAtPosition(clientX, clientY, elements) 
-      ? "move" : 
-      "default";
+      target.style.cursor = getElementAtPosition(clientX, clientY, elements) ? "move" : "default";
     } else {
       const target = event.target as HTMLElement;
       target.style.cursor = "default";
     }
-    
-
-    if (action === "drawing"){
-      const { clientX, clientY } = 'touches' in event ? event.touches[0] : event as React.MouseEvent;
+  
+    if (action === "drawing" && 'touches' in event) {
       const index = elements.length - 1;
       const { x1, y1 } = elements[index];
-      updateElement(index,x1, y1, clientX, clientY, tool);
-    } else if(action === "moving" && selectedElement){
-      const {id, x1, x2, y1, y2, type, offsetX = 0, offsetY=0} = selectedElement
-      const height = y2 -y1
-      const width = x2 -x1
-      const newX1 = clientX - offsetX
-      const newY1 = clientY - offsetY
-      updateElement(id, newX1, newY1, newX1 + width, newY1 + height, type)
+      updateElement(index, x1, y1, clientX, clientY, tool);
+    } else if (action === "drawing" && !('touches' in event)) {
+      const { clientX, clientY } = event as React.MouseEvent;
+      const index = elements.length - 1;
+      const { x1, y1 } = elements[index];
+      updateElement(index, x1, y1, clientX, clientY, tool);
+    } else if (action === "moving" && selectedElement) {
+      const { id, x1, x2, y1, y2, type, offsetX = 0, offsetY = 0 } = selectedElement;
+      const height = y2 - y1;
+      const width = x2 - x1;
+      const newX1 = clientX - offsetX;
+      const newY1 = clientY - offsetY;
+      updateElement(id, newX1, newY1, newX1 + width, newY1 + height, type);
     }
   };
-
+  
   const handleMouseUp = () => {
     setAction("none");
     setSelectedElement(null)
@@ -193,9 +202,8 @@ function App() {
 
     return newDarkMode;
   });
-};
+  };
 
-  
 
   return (
     <>
