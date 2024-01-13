@@ -152,6 +152,9 @@ function App() {
       target.style.cursor = getElementAtPosition(clientX, clientY, elements) 
       ? "move" : 
       "default";
+    } else {
+      const target = event.target as HTMLElement;
+      target.style.cursor = "default";
     }
     
 
