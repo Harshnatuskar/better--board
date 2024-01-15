@@ -57,11 +57,36 @@ function App() {
   const [action, setAction] = useState("none");
   const [tool, setTool] = useState<string>("line");
   const [selectedElement, setSelectedElement] = useState<Element | null>(null)
-  const [darkMode, setDarkMode] = useState(false);
+  const [history, setHistory] = useState<Element[][]>([]);
+  const [currentState, setCurrentState] = useState<Element[]>([]);
+  const [currentIndex, setCurrentIndex] = useState<number>(-1);
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    const storedDarkMode = localStorage.getItem('darkMode');
+    return storedDarkMode ? JSON.parse(storedDarkMode) : false;
+  });
 
+  
   useEffect(() => {
+    const handleUndo = () => {
+      if (currentIndex > 0) {
+        setCurrentIndex(currentIndex - 1);
+        setCurrentState(history[currentIndex - 1]);
+      }
+    };
+  
+    const handleRedo = () => {
+      if (currentIndex < history.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+        setCurrentState(history[currentIndex + 1]);
+      }
+    };
+  
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'l' || event.key === 'L') {
+      if (event.ctrlKey && event.key === 'z' || event.ctrlKey && event.key === 'Z') {
+        handleUndo();
+      } else if (event.ctrlKey && event.key === 'r' || event.ctrlKey && event.key === 'R') {
+        handleRedo();
+      } else if (event.key === 'l' || event.key === 'L') {
         setTool('line');
       } else if (event.key === 'r' || event.key === 'R') {
         setTool('rectangle');
@@ -69,13 +94,15 @@ function App() {
         setTool('selection');
       }
     };
-
+  
     document.addEventListener('keydown', handleKeyDown);
-
+  
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [])
+  }, [currentIndex, history, setCurrentIndex, setCurrentState, setTool]);
+  
+  
 
   useLayoutEffect(() => {
     const canvas = document.getElementById("canvas") as HTMLCanvasElement | null;
@@ -83,26 +110,33 @@ function App() {
       console.error("Canvas not found");
       return;
     }
-
+  
     const context = canvas.getContext("2d");
     if (!context) {
       console.error("2d context not supported");
       return;
     }
-
+  
     context?.clearRect(0, 0, canvas.width, canvas.height);
-
+  
     const roughCanvas = rough.canvas(canvas);
-    elements.forEach(({ roughElement }) => roughCanvas.draw(roughElement));
-  }, [elements]);
+  
+    currentState.forEach((element) => {
+      if (element && element.roughElement) {
+        roughCanvas.draw(element.roughElement);
+      }
+    });
+  }, [currentState]);
+  
+  
 
-  const updateElement = (id: number, x1:number, y1:number, clientX:number, clientY:number, type:string) =>{
-    const updatedElement = createElement(id, x1, y1, clientX, clientY, type)
-
-    const elementsCopy = [...elements]
-    elementsCopy[id] = updatedElement
-    setElements(elementsCopy)
-  }
+  const updateElement = (id: number, x1: number, y1: number, clientX: number, clientY: number, type: string) => {
+    const updatedElement = createElement(id, x1, y1, clientX, clientY, type);
+    const elementsCopy = [...currentState];
+    elementsCopy[id] = updatedElement;
+    setCurrentState(elementsCopy);
+    saveState(elementsCopy);
+  };
 
   const handleLineButtonClick = () => {
     setTool('line');
@@ -112,9 +146,12 @@ function App() {
     setTool('rectangle');
   };
 
-  const handleSelection = () =>{
-    setTool('selection')
-  }
+  const handleSelection = () => {
+    setTool('selection');
+    setAction('none');
+    setSelectedElement(null);
+  };
+  
 
   const getTouchCoordinates = (event: React.TouchEvent) =>{
     const touch = event.touches[0];
@@ -126,23 +163,23 @@ function App() {
 
   const handleMouseDown = (event: React.MouseEvent | React.TouchEvent) => {
     const { clientX, clientY } = 'touches' in event ? getTouchCoordinates(event as React.TouchEvent) : (event as React.MouseEvent);
-    if(tool === "selection"){
-      const element = getElementAtPosition(clientX, clientY, elements)
-      if(element){ 
-        const offsetX = clientX - element.x1
-        const offsetY = clientY - element.y1
-        setSelectedElement({...element, offsetX, offsetY})
-        setAction("moving") 
+  
+    if (tool === 'selection') {
+      const element = getElementAtPosition(clientX, clientY, currentState);
+      if (element) {
+        const offsetX = clientX - element.x1;
+        const offsetY = clientY - element.y1;
+        setSelectedElement({ ...element, offsetX, offsetY });
+        setAction('moving');
       }
-    }else{
-      const id = elements.length
-      const element = createElement(id,clientX, clientY, clientX, clientY, tool);
-      setElements(prevState => [...prevState,element])
-      setAction("drawing")
+    } else {
+      const id = elements.length;
+      const element = createElement(id, clientX, clientY, clientX, clientY, tool);
+      setElements((prevState) => [...prevState, element]);
+      setAction('drawing');
     }
-    
   };
-
+  
   const handleMouseMove = (event: React.MouseEvent | React.TouchEvent) => {
     let clientX, clientY;
   
@@ -155,83 +192,96 @@ function App() {
       clientY = (event as React.MouseEvent).clientY;
     }
   
-    if (tool === "selection") {
+    if (tool === 'selection') {
       const target = event.target as HTMLElement;
-      target.style.cursor = getElementAtPosition(clientX, clientY, elements) ? "move" : "default";
+      target.style.cursor = getElementAtPosition(clientX, clientY, currentState) ? 'move' : 'default';
+  
+      if (action === 'moving' && selectedElement) {
+        const { id, x1, x2, y1, y2, type, offsetX = 0, offsetY = 0 } = selectedElement;
+        const height = y2 - y1;
+        const width = x2 - x1;
+        const newX1 = clientX - offsetX;
+        const newY1 = clientY - offsetY;
+        updateElement(id, newX1, newY1, newX1 + width, newY1 + height, type);
+      }
     } else {
       const target = event.target as HTMLElement;
-      target.style.cursor = "default";
-    }
+      target.style.cursor = 'default';
   
-    if (action === "drawing" && 'touches' in event) {
-      const index = elements.length - 1;
-      const { x1, y1 } = elements[index];
-      updateElement(index, x1, y1, clientX, clientY, tool);
-    } else if (action === "drawing" && !('touches' in event)) {
-      const { clientX, clientY } = event as React.MouseEvent;
-      const index = elements.length - 1;
-      const { x1, y1 } = elements[index];
-      updateElement(index, x1, y1, clientX, clientY, tool);
-    } else if (action === "moving" && selectedElement) {
-      const { id, x1, x2, y1, y2, type, offsetX = 0, offsetY = 0 } = selectedElement;
-      const height = y2 - y1;
-      const width = x2 - x1;
-      const newX1 = clientX - offsetX;
-      const newY1 = clientY - offsetY;
-      updateElement(id, newX1, newY1, newX1 + width, newY1 + height, type);
+      if (action === 'drawing' && 'touches' in event) {
+        const index = elements.length - 1;
+        const { x1, y1 } = elements[index];
+        updateElement(index, x1, y1, clientX, clientY, tool);
+      } else if (action === 'drawing' && !('touches' in event)) {
+        const { clientX, clientY } = event as React.MouseEvent;
+        const index = elements.length - 1;
+        const { x1, y1 } = elements[index];
+        updateElement(index, x1, y1, clientX, clientY, tool);
+      }
     }
   };
   
   const handleMouseUp = () => {
-    setAction("none");
-    setSelectedElement(null)
+    setAction('none');
+    setSelectedElement(null);
   };
+  
 
   const toggleDarkMode = () => {
-  setDarkMode((prevDarkMode) => {
-    const newDarkMode = !prevDarkMode;
-
-    const body = document.body;
-    if (newDarkMode) {
-      body.style.backgroundColor = "#1a1a1a";
-      body.style.color = "#ffffff";
-    } else {
-      body.style.backgroundColor = "#ffffff";
-      body.style.color = "#000000";
-    }
-
-    return newDarkMode;
-  });
+    setDarkMode((prevDarkMode) => {
+      const newDarkMode = !prevDarkMode;
+  
+      const body = document.body;
+      if (newDarkMode) {
+        body.style.backgroundColor = "#1a1a1a";
+        body.style.color = "#ffffff";
+      } else {
+        body.style.backgroundColor = "#ffffff";
+        body.style.color = "#000000";
+      }
+  
+      localStorage.setItem('darkMode', JSON.stringify(newDarkMode));
+  
+      return newDarkMode;
+    });
   };
+  
+
+  const saveState = (newState: Element[]) => {
+    const newHistory = history.slice(0, currentIndex + 1);
+    newHistory.push(newState);
+    setHistory(newHistory);
+    setCurrentIndex(currentIndex + 1);
+  };
+  
 
 
   return (
     <>
       <div style={{ position: "fixed", bottom: 15, right: 15, display: "flex", flexDirection: "column", gap: 10 }}>
         <button
-          id="darkMode"
-          onClick={toggleDarkMode}
-          style={{
-            backgroundColor: darkMode ? "grey" : "#757575",
-            color: darkMode ? "white" : "#ffffff",
-            padding: "5px 10px",
-            border: "none",
-            borderRadius: "5px",
-            cursor: "pointer",
-          }}
+        id="darkMode"
+        onClick={toggleDarkMode}
+        style={{
+          backgroundColor: darkMode ? "grey" : "#757575",
+          color: darkMode ? "white" : "#ffffff",
+          padding: "5px 10px",
+          border: "none",
+          borderRadius: "5px",
+          cursor: "pointer",
+        }}
         >
-          <svg data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"></path>
-          </svg>
-          
+        <svg data-slot="icon" fill="none" strokeWidth="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"></path>
+        </svg>
         </button>
         <button 
           id="selection" 
           onClick={handleSelection}
           style={{ backgroundColor: "grey", padding: "5px 10px", border: "none", borderRadius: "5px", cursor: "pointer" }}
         >
-          <svg data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"></path>
+          <svg data-slot="icon" fill="none" strokeWidth="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"></path>
           </svg>
         </button>
         <button 
