@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState,useEffect } from "react";
+import { useLayoutEffect, useState, useEffect } from "react";
 import rough from 'roughjs';
 import { Drawable } from "roughjs/bin/core";
 
@@ -21,35 +21,35 @@ interface Point {
   y: number;
 }
 
-function createElement(id: number,x1: number, y1: number, x2: number, y2: number, type: string):Element {
-  const lineColor = "grey"
+function createElement(id: number, x1: number, y1: number, x2: number, y2: number, type: string): Element {
+  const lineColor = "grey";
   const roughElement = type === "line"
-    ? generator.line(x1, y1, x2, y2,{roughness: 0.5,stroke: lineColor })
-    : generator.rectangle(x1, y1, x2 - x1, y2 - y1,{roughness: 0.5,stroke: lineColor });
-  return {id, x1, y1, x2, y2, roughElement , type: type as 'line'| 'rectangle',offsetX: undefined, offsetY: undefined  };
+    ? generator.line(x1, y1, x2, y2, { roughness: 0.5, stroke: lineColor })
+    : generator.rectangle(x1, y1, x2 - x1, y2 - y1, { roughness: 0.5, stroke: lineColor });
+  return { id, x1, y1, x2, y2, roughElement, type: type as 'line' | 'rectangle', offsetX: undefined, offsetY: undefined };
 }
 
-const distance = (a: Point, b: Point) => Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2))
+const distance = (a: Point, b: Point) => Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
 
-const isWithinElement = (x: number, y: number, element: Element):boolean=>{
-  const {type,x1,x2,y1,y2} = element
-  if(type === "rectangle"){
-    const minX = Math.min(x1, x2)
-    const maxX = Math.max(x1, x2)
-    const minY = Math.min(y1, y2)
-    const maxY = Math.max(y1, y2)
-    return x >= minX &&  x <= maxX && y >= minY && y <= maxY
-  }else{
-    const a = { x:x1, y:y1}
-    const b = { x:x2, y:y2}
-    const c = { x, y}
-    const offset = distance(a,b) - (distance(a,c) + distance(b,c))
-    return Math.abs(offset) < 1
+const isWithinElement = (x: number, y: number, element: Element): boolean => {
+  const { type, x1, x2, y1, y2 } = element;
+  if (type === "rectangle") {
+    const minX = Math.min(x1, x2);
+    const maxX = Math.max(x1, x2);
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+    return x >= minX && x <= maxX && y >= minY && y <= maxY;
+  } else {
+    const a = { x: x1, y: y1 };
+    const b = { x: x2, y: y2 };
+    const c = { x, y };
+    const offset = distance(a, b) - (distance(a, c) + distance(b, c));
+    return Math.abs(offset) < 1;
   }
 }
 
-const getElementAtPosition= (x:number, y:number, elements: Element[]): Element | undefined=>{
-  return elements.find(element => isWithinElement(x,y,element))
+const getElementAtPosition = (x: number, y: number, elements: Element[]): Element | undefined => {
+  return elements.find(element => isWithinElement(x, y, element));
 }
 
 function App() {
@@ -64,8 +64,8 @@ function App() {
     const storedDarkMode = localStorage.getItem('darkMode');
     return storedDarkMode ? JSON.parse(storedDarkMode) : false;
   });
+  const [textInputMode, setTextInputMode] = useState<boolean>(false);
 
-  
   useEffect(() => {
     const handleUndo = () => {
       if (currentIndex > 0) {
@@ -73,14 +73,14 @@ function App() {
         setCurrentState(history[currentIndex - 1]);
       }
     };
-  
+
     const handleRedo = () => {
       if (currentIndex < history.length - 1) {
         setCurrentIndex(currentIndex + 1);
         setCurrentState(history[currentIndex + 1]);
       }
     };
-  
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.key === 'z' || event.ctrlKey && event.key === 'Z') {
         handleUndo();
@@ -92,6 +92,8 @@ function App() {
         setTool('rectangle');
       } else if (event.key === 's' || event.key === 'S') {
         setTool('selection');
+      } else if (event.key === 't' || event.key === 'T') {
+        setTextInputMode((prevTextInputMode) => !prevTextInputMode);
       }
     };
   
@@ -100,9 +102,7 @@ function App() {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [currentIndex, history, setCurrentIndex, setCurrentState, setTool]);
-  
-  
+  }, [currentIndex, history, setCurrentIndex, setCurrentState, setTool, setTextInputMode]);
 
   useLayoutEffect(() => {
     const canvas = document.getElementById("canvas") as HTMLCanvasElement | null;
@@ -110,25 +110,23 @@ function App() {
       console.error("Canvas not found");
       return;
     }
-  
+
     const context = canvas.getContext("2d");
     if (!context) {
       console.error("2d context not supported");
       return;
     }
-  
+
     context?.clearRect(0, 0, canvas.width, canvas.height);
-  
+
     const roughCanvas = rough.canvas(canvas);
-  
+
     currentState.forEach((element) => {
       if (element && element.roughElement) {
         roughCanvas.draw(element.roughElement);
       }
     });
   }, [currentState]);
-  
-  
 
   const updateElement = (id: number, x1: number, y1: number, clientX: number, clientY: number, type: string) => {
     const updatedElement = createElement(id, x1, y1, clientX, clientY, type);
@@ -151,20 +149,39 @@ function App() {
     setAction('none');
     setSelectedElement(null);
   };
-  
 
-  const getTouchCoordinates = (event: React.TouchEvent) =>{
+  const getTouchCoordinates = (event: React.TouchEvent) => {
     const touch = event.touches[0];
-    return{
+    return {
       clientX: touch.clientX,
       clientY: touch.clientY
     }
   }
 
   const handleMouseDown = (event: React.MouseEvent | React.TouchEvent) => {
-    const { clientX, clientY } = 'touches' in event ? getTouchCoordinates(event as React.TouchEvent) : (event as React.MouseEvent);
-  
-    if (tool === 'selection') {
+    const { clientX, clientY } =
+      "touches" in event
+        ? getTouchCoordinates(event as React.TouchEvent)
+        : (event as React.MouseEvent);
+
+    if (textInputMode) {
+      const input = document.createElement("input");
+
+      input.type = "text";
+      input.style.position = "fixed";
+      input.style.left = clientX + "px"; 
+      input.style.top = clientY + "px"; 
+      input.style.backgroundColor = "transparent"; 
+      input.style.border = "1px solid #757575"; 
+      input.style.borderRadius = "5px";
+      input.style.padding = "5px 10px"; 
+      input.style.color = "#757575"; 
+
+      document.body.appendChild(input);
+
+      input.focus();
+      setTextInputMode(false);
+    } else if (tool === 'selection') {
       const element = getElementAtPosition(clientX, clientY, currentState);
       if (element) {
         const offsetX = clientX - element.x1;
@@ -179,10 +196,10 @@ function App() {
       setAction('drawing');
     }
   };
-  
+
   const handleMouseMove = (event: React.MouseEvent | React.TouchEvent) => {
     let clientX, clientY;
-  
+
     if ('touches' in event) {
       const touch = event.touches[0];
       clientX = touch.clientX;
@@ -191,11 +208,11 @@ function App() {
       clientX = (event as React.MouseEvent).clientX;
       clientY = (event as React.MouseEvent).clientY;
     }
-  
+
     if (tool === 'selection') {
       const target = event.target as HTMLElement;
       target.style.cursor = getElementAtPosition(clientX, clientY, currentState) ? 'move' : 'default';
-  
+
       if (action === 'moving' && selectedElement) {
         const { id, x1, x2, y1, y2, type, offsetX = 0, offsetY = 0 } = selectedElement;
         const height = y2 - y1;
@@ -207,7 +224,7 @@ function App() {
     } else {
       const target = event.target as HTMLElement;
       target.style.cursor = 'default';
-  
+
       if (action === 'drawing' && 'touches' in event) {
         const index = elements.length - 1;
         const { x1, y1 } = elements[index];
@@ -220,17 +237,16 @@ function App() {
       }
     }
   };
-  
+
   const handleMouseUp = () => {
     setAction('none');
     setSelectedElement(null);
   };
-  
 
   const toggleDarkMode = () => {
     setDarkMode((prevDarkMode) => {
       const newDarkMode = !prevDarkMode;
-  
+
       const body = document.body;
       if (newDarkMode) {
         body.style.backgroundColor = "#1a1a1a";
@@ -239,13 +255,12 @@ function App() {
         body.style.backgroundColor = "#ffffff";
         body.style.color = "#000000";
       }
-  
+
       localStorage.setItem('darkMode', JSON.stringify(newDarkMode));
-  
+
       return newDarkMode;
     });
   };
-  
 
   const saveState = (newState: Element[]) => {
     const newHistory = history.slice(0, currentIndex + 1);
@@ -253,12 +268,17 @@ function App() {
     setHistory(newHistory);
     setCurrentIndex(currentIndex + 1);
   };
-  
-
 
   return (
     <>
       <div style={{ position: "fixed", bottom: 15, right: 15, display: "flex", flexDirection: "column", gap: 10 }}>
+        <button
+          id="text"
+          onClick={() => setTextInputMode(!textInputMode)}
+          style={{ backgroundColor: textInputMode ? "grey" : "#757575", padding: "5px 10px", border: "none", borderRadius: "5px", cursor: "pointer" }}
+        >
+          T
+        </button>
         <button
         id="darkMode"
         onClick={toggleDarkMode}
