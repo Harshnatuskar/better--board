@@ -150,6 +150,34 @@ function App() {
     setSelectedElement(null);
   };
 
+  
+
+  const handleTextInput = (input: HTMLInputElement) => {
+    input.addEventListener("input", () => {
+      input.style.border = "1px solid #757575";
+    });
+  
+    input.addEventListener("focus", () => {
+      input.style.border = "1px solid #757575";
+    });
+  
+    input.addEventListener("blur", () => {
+      input.style.border = "none";
+    });
+  
+    
+    const flickerInterval = setInterval(() => {
+      input.style.cursor = input.style.cursor === "text" ? "none" : "text";
+    }, 500); 
+  
+    setTimeout(() => {
+      clearInterval(flickerInterval);
+      input.style.cursor = "text"; 
+    }, 2000); 
+  };
+
+
+
   const getTouchCoordinates = (event: React.TouchEvent) => {
     const touch = event.touches[0];
     return {
@@ -172,10 +200,12 @@ function App() {
       input.style.left = clientX + "px"; 
       input.style.top = clientY + "px"; 
       input.style.backgroundColor = "transparent"; 
-      input.style.border = "1px solid #757575"; 
+      input.style.border = "none"; 
       input.style.borderRadius = "5px";
       input.style.padding = "5px 10px"; 
       input.style.color = "#757575"; 
+
+      handleTextInput(input)
 
       document.body.appendChild(input);
 
